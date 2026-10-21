@@ -29,6 +29,9 @@ cuda = [
 rocm = [
   "onnxruntime-rocm @ https://repo.radeon.com/rocm/manylinux/rocm-rel-7.0/onnxruntime_rocm-1.22.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
 ]
+json = [
+  "music21 >= 10.3.0, < 11",
+]
 
 [dependency-groups]
 dev = [

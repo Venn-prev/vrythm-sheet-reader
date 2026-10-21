@@ -48,6 +48,8 @@ This should cover both qualitative examples and, where possible, quantitative me
 Utilize the [rate_validation_result.py](https://github.com/liebharc/homr/blob/main/validation/rate_validation_result.py) script or our benchmark (for more details see [Benchmark.md](https://github.com/liebharc/homr/blob/main/Benchmark.md)) to generate metrics across multiple images, 
 provided you have access to corresponding groundtruth MusicXML files.
 
+When a change adapts an algorithm, model, or implementation from another project or publication, identify the upstream source and version in the PR. Include the applicable license or paper reference, describe local modifications, and preserve required notices in source files and `THIRD_PARTY_NOTICES.md`. For model changes, also record the checkpoint source and any dataset provenance/licensing information. Do not add copyrighted sheet music or ground truth unless its use and redistribution are permitted.
+
 ### Training Model Updates
 
 If your contribution involves modifications to the model training process, please include a link to the updated trained model. 
@@ -56,6 +58,8 @@ This ensures that reviewers and users can easily access and evaluate the impact 
 ## Licensing
 
 By contributing to `homr`, you agree that your contributions will be licensed under both the AGPL and Apache 2 licenses. This ensures that your contributions can be used in a wide range of applications while maintaining the project's open-source nature.
+
+The repository's `LICENSE` file contains the AGPL-3.0 terms for this checkout. This contributor grant does not remove obligations attached to existing third-party code, model weights, or datasets. Product integrators should review the repository license and notices independently; see the README's product-use section and `THIRD_PARTY_NOTICES.md`. If you cannot make the required licensing grant for a contribution, clarify that before submitting it.
 
 ## Questions?
 

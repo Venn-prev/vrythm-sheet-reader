@@ -1,126 +1,70 @@
-# homr
+# HOMR: Optical Music Recognition
 
-homr is an Optical Music Recognition (OMR) software designed to transform camera pictures or PDFs of sheet music into
-machine-readable MusicXML format. The resulting [MusicXML](https://www.w3.org/2021/06/musicxml40/) files can be further
-processed using tools such as [musescore](https://musescore.com/).
+HOMR converts a raster image of printed sheet music into MusicXML. The core pipeline first detects and segments staff systems with SegNet, then transcribes the symbols on each staff with the TrOMR vision-transformer model, and finally writes MusicXML. The repository does **not** write JSON directly; JSON export is a separate conversion step described below.
 
-For a quick try, visit our online demo at [homr.site](https://homr.site) or [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/liebharc/homr/blob/main/colab.ipynb)
+## Quick Start
 
-You might also want to check out [Andromr](https://github.com/aicelen/Andromr), an Android app for optical music recognition using homr.
+Requirements: Python `>=3.11,<3.16`, Poetry, and an internet connection on first run so HOMR can download its ONNX model weights and OCR data.
 
-## Prerequisites
+From PowerShell, clone the repository and install the runtime plus JSON-converter dependencies:
 
-- Python 3.11 or 3.12
-- Poetry or UV
-- Optional
-  - NVIDIA GPU with CUDA 12.1
-  - AMD GPU with ROCm 7.0
+```powershell
+git clone https://github.com/liebharc/homr.git
+cd homr
+python -m pip install poetry
+poetry self add "poetry-dynamic-versioning[plugin]"
+poetry install --only main --extras cpu --extras json
+poetry run homr --init
+```
 
-## Getting started (uv)
+Put an image such as `score.png` in `data/input/`, create an output folder, and run the two conversion steps:
 
-The easiest way to get started is using `uvx` (`uv` must be installed). Select an inference backend:
-- CPU: `uvx --from 'homr[cpu]' homr <image>`
-- NVIDIA CUDA: `uvx --from 'homr[cuda]' homr <image>`
-- AMD ROCm: `uvx --python 3.12 --from 'homr[rocm]' homr <image>`
+```powershell
+New-Item -ItemType Directory -Force -Path data/input,data/output | Out-Null
+poetry run homr data/input/score.png
+poetry run python coverted_to_json.py data/input/score.musicxml data/output/score.json
+```
 
-- The resulting MusicXML file will be saved in the same directory as the input image
+The first command creates `data/input/score.musicxml` beside the input image. The second creates `data/output/score.json` in the flat `metadata` + `notes[]` format. You can skip `--init`; HOMR downloads missing runtime weights automatically when first run. To use only HOMR's MusicXML output, install without the JSON converter extra: `poetry install --only main --extras cpu`.
 
-## Getting started (poetry)
+The CLI also accepts PDF input, multiple images, and directories. See `poetry run homr --help` for options. When passing a directory, HOMR processes supported images recursively and writes MusicXML beside each input image.
 
-- Clone the repository
-- Install dependencies for:
-  - Inference: `poetry install --only main --extras cpu`
-  - Development: `poetry install --extras cpu`
-  - If using GPU, replace `--extras cpu` to `--extras cuda` / `--extras rocm`
-- Run the program using `poetry run homr <image>`
-- The resulting MusicXML file will be saved in the same directory as the input image
+## JSON Output
 
-## Run on multiple images
-- Just add your image to the command, for example: `poetry run homr <image_1> <image_2>`
-- This produces one file named `merged_image_1.musicxml`
-- To combine MusicXML files, you can use [relieur](https://github.com/papoteur-mga/relieur)
+The converter is `coverted_to_json.py` (the filename is spelled this way in the repository). It reads MusicXML with `music21` and emits the source sample's shape:
 
-## Example
+```json
+{
+	"metadata": {
+		"title": "Score title",
+		"composer": "Composer",
+		"tempo": 115,
+		"keySignature": "C",
+		"timeSignature": {"beats": 4, "beatType": 4}
+	},
+	"notes": [
+		{"id": "n1", "pitch": "E4", "duration": "8"},
+		{"id": "n2", "pitch": "G4", "duration": "q"}
+	]
+}
+```
 
-The example below provides an overview of the current performance of the implementation. While some errors are present
-in the output, the overall structure remains accurate.
+Duration codes are `w`, `h`, `q`, `8`, `16`, `32`, and `64`; dots are appended, for example `q.`. The current converter skips rests, flattens parts into a single notes list, and does not preserve measure numbers or note onset positions. Treat this JSON as a simple melody/export format, not a lossless MusicXML replacement. Use MusicXML when the application needs voices, rests, layout, or exact rhythmic structure.
 
-|                                          Original Image                                           |                                                                               homr Result                                                                                |
-| :-----------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-| <img src="https://github.com/BreezeWhite/oemer/blob/main/figures/tabi.jpg?raw=true" width="400" > | <img src="https://github.com/liebharc/homr/blob/main/figures/tabi.svg?raw=true" alt="Go to https://github.com/liebharc/homr if this image isn't displayed" width="400" > |
+## Algorithm and Source Attribution
 
-The homr result is obtained by processing the [homr output](figures/tabi.musicxml) and rendering it
-with [musescore](https://musescore.com/).
+This repository is the HOMR project: [github.com/liebharc/homr](https://github.com/liebharc/homr). The project metadata identifies Christian Liebhardt as author. The implementation combines staff segmentation (SegNet) and score transcription (TrOMR); see [Training.md](Training.md) for the repository's training history and validation notes. The TrOMR architecture is based on the [TrOMR paper](https://arxiv.org/abs/2308.09370). The SegNet implementation notes its basis in the [segmentation-models-pytorch CamVid example](https://github.com/qubvel-org/segmentation_models.pytorch/blob/main/examples/camvid_segmentation_multiclass.ipynb).
 
-## Limitations
+The score-merging code in `homr/relieur.py` is based on [relieur by Papoteur and contributors](https://github.com/papoteur-mga/relieur/tree/master), under Apache-2.0; its source file retains the original notice. Additional model weights and Python dependencies have their own terms. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and review each applicable license before product distribution.
 
-The current implementation focuses on pitch and rhythm information on the bass or treble clef, neglecting dynamics,
-articulation, double sharps/flats, and other musical symbols.
+## Using HOMR in a Product
 
-## Technical Details
+The repository's [LICENSE](LICENSE) is GNU AGPL-3.0. It permits commercial use, copying, and modification under its conditions; it is not a permissive license for closed-source reuse. In particular, distributing a covered application requires providing corresponding source under the AGPL. Section 13 also requires users interacting remotely with a modified AGPL program to be offered its corresponding source. Whether a separately deployed service and a product form one covered work depends on the integration; review that question for your architecture.
 
-homr uses a two-stage pipeline: **segmentation** for structural analysis followed by **semantic symbol recognition** via transformer models.
+Keep the license and copyright notices, include a copy of `LICENSE`, identify your modifications, and provide the required source and notices when conveying a covered work. If your product cannot comply with the AGPL, obtain a separate license from the relevant copyright holder before integrating the code. This README is project guidance, not legal advice. Do not edit or replace the AGPL text in `LICENSE`; add attribution or notices in separate files.
 
-### Stage 1: Image Segmentation and Structural Analysis
+## Contributing and Testing
 
-homr employs UNet-based segmentation models (adapted from [oemer](https://github.com/BreezeWhite/oemer)) to extract structural components from the sheet music image:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for code, test, provenance, and contribution-license guidance. For local development, initialize the project with `make init`; run the project checks with `make ci`.
 
-- **Staff lines and symbols**: Detected via trained segmentation networks that identify:
-  - Staff line fragments
-  - Note heads
-  - Stems and rests
-  - Bar lines
-  - Clefs and key signatures
-
-The segmentation process generates bounding boxes for each detected element. These predictions serve as inputs for the staff detection algorithm.
-
-### Stage 2: Staff Detection and Merging
-
-Using the segmentation outputs, homr constructs staffs through the following steps:
-
-1. **Staff Anchor Detection**: The algorithm identifies "staff anchors" (clefs and bar lines) that serve as reference points for accurate staff localization, even when symbols partially obscure staff lines.
-
-2. **Unit Size Estimation**: For each staff, the algorithm calculates the "unit size" (distance between staff lines). This accommodates camera perspective variations and non-uniform staff spacing.
-
-3. **Staff Reconstruction**: Around each anchor, five staff lines are located and the remaining staff structure is reconstructed using the estimated unit size.
-
-4. **Grand Staff Merging**: Braces and brackets are identified to merge related staffs, supporting:
-   - Grand staffs (piano, organ)
-   - Multiple voices on a single staff
-   - Mixed instrument groups
-
-### Stage 3: Semantic Symbol Recognition via Transformer
-
-Each staff is dewarped (perspective-corrected) and passed through a transformer-based model (based on [Polyphonic-TrOMR](https://github.com/NetEase/Polyphonic-TrOMR)) that performs **end-to-end symbol sequence recognition**. The model outputs:
-
-- **Rhythm symbols**: Note durations, rests, and tuplet information
-- **Pitch information**: Absolute pitch values with accidentals (sharps, flats, naturals)
-- **Articulation marks**: Accents, staccato, tenuto, and slur markers
-- **Performance annotations**: Dynamic expressions and other musical notation
-
-The transformer model generates these predictions in sequence, processing the dewarped staff image to understand the spatial and temporal relationships between musical symbols.
-
-**Note**: The transformer output provides the sequence of symbols but does not include explicit positional information (horizontal or vertical coordinates). However, the model computes the center of attention as a byproduct of the attention mechanism, which is used to estimate the focus point on the staff image. homr maps this point back to the input image and writes it as a comment into each note of the MusicXML output, e.g. `<!-- imgpos: 45, 231 -->`. These are rough positions: they point at or near the symbol, but aren't pixel-exact.
-
-### Stage 4: MusicXML Output
-
-The symbol sequence is converted into MusicXML format and saved to disk. The resulting file can be processed with tools like [musescore](https://musescore.com/) or [relieur](https://github.com/papoteur-mga/relieur) (for multi-image combinations).
-
-## Citation
-
-If you use this code in your research work, please cite [oemer](https://github.com/BreezeWhite/oemer)
-and [Polyphonic-TrOMR](https://github.com/NetEase/Polyphonic-TrOMR).
-
-## Name
-
-The name "homr" stands for Homer's Optical Music Recognition (OMR), leaving the interpretation of "Homer" to the user's
-discretion, whether referring to the ancient poet [Homer](https://en.wikipedia.org/wiki/Homer) or the iconic character
-from [The Simpsons](https://en.wikipedia.org/wiki/The_Simpsons).
-
-## Thanks
-
-This project builds upon previous work, including:
-
-- The segmentation models of [oemer](https://github.com/BreezeWhite/oemer)
-- The transformer model of [Polyphonic-TrOMR](https://github.com/NetEase/Polyphonic-TrOMR)
-- The starter template provided by [Benjamin Roland](https://github.com/Parici75/python-poetry-bootstrap)
+For integrating image upload and JSON download into a website, see the [Application Integration Guide](APPLICATION_GUIDE.md).
